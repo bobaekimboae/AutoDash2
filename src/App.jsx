@@ -178,6 +178,7 @@ function Field({ label, value, onChange, placeholder, suffix, type = "text" }) {
 
 export function App() {
   const [vehicle, setVehicle] = useState(emptyVehicle);
+  const [credits, setCredits] = useState(5);
   const [photos, setPhotos] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [scenes, setScenes] = useState({});
@@ -316,8 +317,12 @@ export function App() {
   };
 
   const createVideo = async () => {
-    if (selectedPhotos.length < 2) {
+    if (selectedPhotos.length !== MAX_SELECTED) {
       setNotice("영상에 사용할 사진을 정확히 5장 선택해 주세요.");
+      return;
+    }
+    if (credits < 1) {
+      setNotice("사용 가능한 크레딧이 없습니다.");
       return;
     }
     if (!canvasRef.current?.captureStream || !window.MediaRecorder) {
@@ -370,6 +375,7 @@ export function App() {
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
       setVideoType(blob.type.includes("mp4") ? "mp4" : "webm");
+      setCredits((value) => Math.max(0, value - 1));
       setIsRendering(false);
       setRenderProgress(100);
       setNotice("영상이 완성됐습니다. 미리보기 후 내려받을 수 있습니다.");
@@ -404,7 +410,7 @@ export function App() {
 
   const photoSelectLabel = selectedPhotos.length ? `${selectedPhotos.length}장 선택` : "선택된 사진 없음";
   const hasVehicle = Boolean(vehicle.make.trim() && vehicle.model.trim() && vehicle.year.trim());
-  const canCreate = hasVehicle && selectedPhotos.length === MAX_SELECTED && !isRendering;
+  const canCreate = hasVehicle && selectedPhotos.length === MAX_SELECTED && credits > 0 && !isRendering;
 
   return (
     <div className="app-shell">
@@ -413,14 +419,14 @@ export function App() {
         <p className="sidebar-label">작업 공간</p>
         <a className="sidebar-link" href="#vehicle-title"><span>▦</span> 차량</a>
         <a className="sidebar-link selected" href="#photos-title"><span>＋</span> 새 차량</a>
-        <div className="sidebar-credit"><small>크레딧</small><strong>5</strong><button type="button" onClick={() => setNotice("크레딧 결제는 이 재현 앱에 연결되어 있지 않습니다.")}>구입하기</button></div>
+        <div className="sidebar-credit"><small>크레딧</small><strong>{credits}</strong><button type="button" onClick={() => setNotice("크레딧 결제는 연결되어 있지 않습니다. 영상 제작은 브라우저에서 진행됩니다.")}>구입하기</button></div>
         <a className="sidebar-help" href="#guide">?　도움말</a>
       </nav>
       <header className="topbar">
         <a className="wordmark" href="#top" aria-label="AutoDash 홈">
           <span>AutoDash</span>
         </a>
-        <div className="topbar-note">크레딧　<strong>5</strong></div>
+        <div className="topbar-note">크레딧　<strong>{credits}</strong></div>
         <button className="language-button" type="button">한국어</button><span className="avatar-dot">●</span>
       </header>
 
@@ -433,7 +439,7 @@ export function App() {
               <h1>{[vehicle.make, vehicle.model].filter(Boolean).join(" ") || "차량 영상"}</h1>
               <p className="intro-copy">사진을 추가하고, 스타일을 선택하고, 나만의 영상을 만들어 보세요.</p>
             </div>
-            <span className="saved-status"><i /> 모든 변경 사항이 저장되었습니다.</span>
+            <span className="saved-status"><i /> 변경 사항은 현재 브라우저에서 처리됩니다.</span>
           </div>
 
           <div className="welcome-banner">환영합니다! 5크레딧이 주어졌습니다. 1크레딧으로 영상 하나를 완성할 수 있습니다.</div>
@@ -540,7 +546,7 @@ export function App() {
         <aside className="preview-column" aria-label="영상 설정 요약">
           <div className="summary-card">
             <p className="eyebrow">당신의 영상</p><h2>{canCreate ? "영상 제작을 시작하세요" : "설정을 완료하세요"}</h2>
-            <p className="summary-cost">영상당 1크레딧 · 잔액: 5크레딧</p>
+            <p className="summary-cost">영상당 1크레딧 · 잔액: {credits}크레딧</p>
             <div className="summary-checks">
               <div className={hasVehicle ? "done" : ""}><i>{hasVehicle ? "✓" : "1"}</i> 차량 상세 정보</div>
               <div className={selectedPhotos.length === MAX_SELECTED ? "done" : ""}><i>{selectedPhotos.length === MAX_SELECTED ? "✓" : "2"}</i> 사진 5장 중 {selectedPhotos.length}장</div>
@@ -549,7 +555,7 @@ export function App() {
             </div>
             {isRendering && <div className="rendering-panel"><div className="rendering-label"><span><LoaderCircle className="spin" size={16} /> 영상 만드는 중</span><b>{renderProgress}%</b></div><div className="progress-track"><i style={{ width: `${renderProgress}%` }} /></div><small>이 탭을 열어 두세요. 사진 수에 따라 잠시 걸릴 수 있습니다.</small></div>}
             {videoUrl && <button className="download-button" onClick={downloadVideo}><Download size={17} /> 영상 내려받기 <span>{videoType.toUpperCase()}</span></button>}
-            <button className="create-button" onClick={createVideo} disabled={!canCreate}>{isRendering ? <><LoaderCircle className="spin" size={18} /> 영상 제작 중</> : <><Clapperboard size={18} /> {videoUrl ? "다시 만들기" : canCreate ? "영상 제작" : "필수 입력란을 모두 작성하세요."}</>}</button>
+            <button className="create-button" onClick={createVideo} disabled={!canCreate}>{isRendering ? <><LoaderCircle className="spin" size={18} /> 영상 제작 중</> : <><Clapperboard size={18} /> {videoUrl ? "다시 만들기" : credits < 1 ? "크레딧이 부족합니다." : canCreate ? "영상 제작" : "필수 입력란을 모두 작성하세요."}</>}</button>
             <p className="export-hint"><VolumeX size={14} /> 무음 영상 · {videoType ? `${videoType.toUpperCase()} 파일` : "브라우저 지원 형식으로 저장"}</p>
           </div>
           <div className="preview-head"><div><p className="eyebrow">LIVE PREVIEW</p><h2>영상 미리보기</h2></div><span className="ratio-badge">9:16</span></div>
