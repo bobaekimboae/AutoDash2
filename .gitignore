@@ -1,0 +1,8 @@
+node_modules/
+dist/
+package/
+npm.tgz
+dev-server.log
+dev-server-error.log
+.DS_Store
+
