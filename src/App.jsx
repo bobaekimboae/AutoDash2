@@ -86,6 +86,38 @@ function drawFrame(canvas, image, scene, vehicle, theme, progress, photoIndex, t
   ctx.fillRect(0, h * 0.4, w, h * 0.6);
 
   const palette = THEMES[theme] || THEMES.prism;
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = 2;
+  if (theme === "prism") {
+    ctx.globalAlpha = 0.46;
+    for (let gx = 42; gx < w; gx += 76) { ctx.beginPath(); ctx.moveTo(gx, 110); ctx.lineTo(gx, h - 340); ctx.stroke(); }
+    for (let gy = 130; gy < h - 340; gy += 76) { ctx.beginPath(); ctx.moveTo(36, gy); ctx.lineTo(w - 36, gy); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  } else if (theme === "showroom" || theme === "chrome") {
+    ctx.strokeRect(24, 24, w - 48, h - 48);
+    ctx.strokeRect(31, 31, w - 62, h - 62);
+  } else if (theme === "trailer") {
+    ctx.fillStyle = "rgba(8,10,12,.48)";
+    ctx.fillRect(0, h - 380, w, 380);
+    ctx.fillStyle = palette.accent;
+    ctx.fillRect(0, h - 380, 11, 380);
+  } else if (theme === "listing") {
+    ctx.fillStyle = "rgba(10,18,15,.62)";
+    ctx.beginPath(); ctx.roundRect(28, 24, 186, 48, 9); ctx.fill();
+    ctx.fillStyle = palette.accent; ctx.fillRect(28, 24, 5, 48);
+  } else if (theme === "dolly" || theme === "gallery") {
+    ctx.fillStyle = "rgba(16,13,10,.46)"; ctx.fillRect(0, h - 350, w, 350);
+    ctx.fillStyle = palette.accent; ctx.fillRect(42, h - 342, w - 84, 2);
+  } else if (theme === "parallax") {
+    ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.moveTo(w - 60, 90); ctx.lineTo(w - 60, h - 90); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - 78, 108); ctx.lineTo(w - 42, 108); ctx.stroke(); ctx.globalAlpha = 1;
+  } else if (theme === "film") {
+    ctx.fillStyle = "rgba(5,5,5,.56)"; ctx.fillRect(0, 0, 24, h); ctx.fillRect(w - 24, 0, 24, h);
+    ctx.fillStyle = palette.accent; for (let sy = 22; sy < h; sy += 34) { ctx.fillRect(8, sy, 8, 15); ctx.fillRect(w - 16, sy, 8, 15); }
+  } else if (theme === "type") {
+    ctx.fillStyle = "rgba(0,0,0,.66)"; ctx.fillRect(0, h - 304, w, 304);
+    ctx.fillStyle = palette.accent; ctx.fillRect(42, h - 286, 46, 4);
+  }
   ctx.fillStyle = palette.accent;
   ctx.beginPath();
   ctx.roundRect(36, 42, 9, 34, 5);
@@ -96,7 +128,7 @@ function drawFrame(canvas, image, scene, vehicle, theme, progress, photoIndex, t
 
   const vehicleTitle = [vehicle.make, vehicle.model].filter(Boolean).join(" ") || "차량 매물 소개";
   ctx.fillStyle = "#fff";
-  ctx.font = "700 54px Pretendard, Arial, sans-serif";
+  ctx.font = theme === "trailer" ? "800 60px Pretendard, Arial, sans-serif" : theme === "dolly" || theme === "gallery" ? "600 54px Georgia, serif" : theme === "type" ? "800 48px Pretendard, Arial, sans-serif" : "700 54px Pretendard, Arial, sans-serif";
   wrapCanvasText(ctx, scene.title || vehicleTitle, 42, h - 302, w - 84, 66, 2);
   ctx.fillStyle = palette.accent;
   ctx.font = "700 23px Pretendard, Arial, sans-serif";
