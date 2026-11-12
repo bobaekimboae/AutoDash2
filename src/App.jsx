@@ -7,7 +7,7 @@ import {
 
 const MAX_PHOTOS = 20;
 const MAX_SELECTED = 5;
-const LISTING_API = "https://autodash2-listing-api.vercel.app";
+const LISTING_API = "https://121-78-125-73.sslip.io/autodash2-api";
 const THEMES = {
   prism: { label: "프리즘 그리드", accent: "#f7bc4b", ink: "#16120a", wash: "#fff5df" },
   dolly: { label: "돌리", accent: "#e9e1d3", ink: "#27211b", wash: "#f6f2eb" },
@@ -222,7 +222,7 @@ export function App() {
 
     setListingLoading(true);
     try {
-      const listingResponse = await fetch(`${LISTING_API}/api/listing?url=${encodeURIComponent(url.href)}`);
+      const listingResponse = await fetch(`${LISTING_API}/listing?url=${encodeURIComponent(url.href)}`);
       const listing = await listingResponse.json();
       if (!listingResponse.ok) throw new Error(listing.error || "매물 정보를 가져오지 못했습니다.");
       setVehicle((previous) => ({ ...previous, ...listing.vehicle, currency: "KRW · ₩" }));
@@ -230,7 +230,7 @@ export function App() {
       const remaining = Math.max(0, MAX_PHOTOS - photos.length);
       const photoUrls = (listing.photos || []).slice(0, Math.min(remaining, MAX_PHOTOS));
       const results = await Promise.allSettled(photoUrls.map(async (photoUrl, index) => {
-        const response = await fetch(`${LISTING_API}/api/photo?url=${encodeURIComponent(photoUrl)}`);
+        const response = await fetch(`${LISTING_API}/photo?url=${encodeURIComponent(photoUrl)}`);
         if (!response.ok) throw new Error("차량 사진을 가져오지 못했습니다.");
         const blob = await response.blob();
         const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
