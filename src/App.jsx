@@ -342,6 +342,9 @@ export function App() {
         image: await loadImage(photo.url),
         scene: getScene(photo, index, selectedPhotos.length),
       })));
+      if (scenesToRender.length !== MAX_SELECTED || scenesToRender.some((scene) => !scene?.image)) {
+        throw new Error("The selected photos could not be prepared for rendering.");
+      }
       logoImage = logo?.url ? await loadImage(logo.url).catch(() => null) : null;
     } catch {
       setIsRendering(false);
@@ -361,16 +364,22 @@ export function App() {
       return;
     }
     const chunks = [];
+    let renderFailed = false;
     const durationPerScene = 3200;
     const totalDuration = durationPerScene * scenesToRender.length;
     recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
     recorder.onerror = () => {
+      renderFailed = true;
       stream.getTracks().forEach((track) => track.stop());
       setIsRendering(false);
       setNotice("영상 생성 중 오류가 발생했습니다. 사진 수를 줄여 다시 시도해 주세요.");
     };
     recorder.onstop = () => {
       stream.getTracks().forEach((track) => track.stop());
+      if (renderFailed) {
+        setIsRendering(false);
+        return;
+      }
       const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || "video/webm" });
       const url = URL.createObjectURL(blob);
       setVideoUrl(url);
@@ -385,13 +394,33 @@ export function App() {
     const render = (now) => {
       const elapsed = now - start;
       const globalProgress = Math.min(elapsed / totalDuration, 1);
-      const sceneIndex = Math.min(Math.floor(elapsed / durationPerScene), scenesToRender.length - 1);
+      const sceneIndex = Math.max(0, Math.min(Math.floor(elapsed / durationPerScene), scenesToRender.length - 1));
       const sceneProgress = (elapsed % durationPerScene) / durationPerScene;
-      const current = scenesToRender[sceneIndex];
-      drawFrame(canvas, current.image, current.scene, vehicle, theme, sceneProgress, sceneIndex, scenesToRender.length, showPrice, logoImage);
+      const current = scenesToRender[sceneIndex] || scenesToRender.at(-1);
+      if (!current?.image) {
+        renderFailed = true;
+        setNotice("영상 장면을 준비하지 못했습니다. 사진 5장을 다시 선택해 주세요.");
+        try { recorder.stop(); } catch { stream.getTracks().forEach((track) => track.stop()); setIsRendering(false); }
+        return;
+      }
+      try {
+        drawFrame(canvas, current.image, current.scene, vehicle, theme, sceneProgress, sceneIndex, scenesToRender.length, showPrice, logoImage);
+      } catch {
+        renderFailed = true;
+        setNotice("영상 장면을 그리는 중 오류가 발생했습니다. 사진을 다시 선택해 주세요.");
+        try { recorder.stop(); } catch { stream.getTracks().forEach((track) => track.stop()); setIsRendering(false); }
+        return;
+      }
       setRenderProgress(Math.round(globalProgress * 100));
       if (elapsed >= totalDuration) {
-        drawFrame(canvas, scenesToRender.at(-1).image, scenesToRender.at(-1).scene, vehicle, theme, 1, scenesToRender.length - 1, scenesToRender.length, showPrice, logoImage);
+        const finalScene = scenesToRender.at(-1);
+        if (!finalScene?.image) {
+          renderFailed = true;
+          setNotice("마지막 장면을 준비하지 못했습니다. 다시 제작해 주세요.");
+          try { recorder.stop(); } catch { stream.getTracks().forEach((track) => track.stop()); setIsRendering(false); }
+          return;
+        }
+        drawFrame(canvas, finalScene.image, finalScene.scene, vehicle, theme, 1, scenesToRender.length - 1, scenesToRender.length, showPrice, logoImage);
         recorder.stop();
         return;
       }
