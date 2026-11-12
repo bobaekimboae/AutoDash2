@@ -7,6 +7,7 @@ import {
 
 const MAX_PHOTOS = 20;
 const MAX_SELECTED = 5;
+const LISTING_API = "https://autodash2-listing-api.vercel.app";
 const THEMES = {
   prism: { label: "프리즘 그리드", accent: "#f7bc4b", ink: "#16120a", wash: "#fff5df" },
   dolly: { label: "돌리", accent: "#e9e1d3", ink: "#27211b", wash: "#f6f2eb" },
@@ -185,6 +186,7 @@ export function App() {
   const [theme, setTheme] = useState("prism");
   const [startMode, setStartMode] = useState("manual");
   const [listingUrl, setListingUrl] = useState("");
+  const [listingLoading, setListingLoading] = useState(false);
   const [logo, setLogo] = useState(null);
   const [showPrice, setShowPrice] = useState(true);
   const [playing, setPlaying] = useState(false);
@@ -204,6 +206,48 @@ export function App() {
 
   const updateVehicle = (key, value) => setVehicle((previous) => ({ ...previous, [key]: value }));
   const getScene = useCallback((photo, index, count) => scenes[photo?.id] || makeSceneLines(vehicle, index, count), [scenes, vehicle]);
+
+  const importListing = async () => {
+    let url;
+    try {
+      url = new URL(listingUrl.trim());
+      if (url.protocol !== "https:" || !["www.bobaedream.co.kr", "bobaedream.co.kr"].includes(url.hostname)) {
+        throw new Error("보배드림 매물 링크를 입력해 주세요.");
+      }
+      if (!url.pathname.startsWith("/cyber/CyberCar_view.php")) throw new Error("보배드림 사이버매장 상세 링크를 입력해 주세요.");
+    } catch (error) {
+      setNotice(error.message || "올바른 매물 URL을 입력해 주세요.");
+      return;
+    }
+
+    setListingLoading(true);
+    try {
+      const listingResponse = await fetch(`${LISTING_API}/api/listing?url=${encodeURIComponent(url.href)}`);
+      const listing = await listingResponse.json();
+      if (!listingResponse.ok) throw new Error(listing.error || "매물 정보를 가져오지 못했습니다.");
+      setVehicle((previous) => ({ ...previous, ...listing.vehicle, currency: "KRW · ₩" }));
+
+      const remaining = Math.max(0, MAX_PHOTOS - photos.length);
+      const photoUrls = (listing.photos || []).slice(0, Math.min(remaining, MAX_PHOTOS));
+      const results = await Promise.allSettled(photoUrls.map(async (photoUrl, index) => {
+        const response = await fetch(`${LISTING_API}/api/photo?url=${encodeURIComponent(photoUrl)}`);
+        if (!response.ok) throw new Error("차량 사진을 가져오지 못했습니다.");
+        const blob = await response.blob();
+        const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+        return new File([blob], `보배드림-${listing.id}-${String(index + 1).padStart(2, "0")}.${extension}`, { type: blob.type || "image/jpeg" });
+      }));
+      const imageFiles = results.filter((result) => result.status === "fulfilled").map((result) => result.value);
+      if (imageFiles.length) addPhotos(imageFiles);
+      const failed = results.length - imageFiles.length;
+      setNotice(imageFiles.length
+        ? `차량 정보와 사진 ${imageFiles.length}장을 가져왔습니다.${failed ? ` 사진 ${failed}장은 불러오지 못했습니다.` : ""} 영상에 사용할 사진 5장을 확인해 주세요.`
+        : `${listing.title || "차량 정보"}를 가져왔습니다. 사진은 불러오지 못해 직접 업로드해 주세요.`);
+    } catch (error) {
+      setNotice(error.message || "매물 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setListingLoading(false);
+    }
+  };
 
   const addPhotos = (files) => {
     const available = MAX_PHOTOS - photos.length;
@@ -479,7 +523,7 @@ export function App() {
               <button className={startMode === "listing" ? "active" : ""} onClick={() => setStartMode("listing")}>목록 링크</button>
               <button className={startMode === "manual" ? "active" : ""} onClick={() => setStartMode("manual")}>수동으로 입력하세요</button>
             </div>
-            {startMode === "listing" ? <div className="listing-import"><p>차량 매물 링크를 붙여넣으세요. 지원되지 않는 사이트라면 아래 정보를 직접 입력해 주세요.</p><div><input aria-label="차량 매물 링크" value={listingUrl} onChange={(event) => setListingUrl(event.target.value)} placeholder="https://..."/><button className="outline-button compact" onClick={() => { try { const url = new URL(listingUrl); const fields = ["make", "model", "year", "mileage", "price"]; let count = 0; setVehicle((previous) => { const next = { ...previous }; fields.forEach((key) => { const value = url.searchParams.get(key); if (value) { next[key] = value; count++; } }); return next; }); setNotice(count ? `${count}개 차량 정보를 링크에서 가져왔습니다.` : "이 매물 사이트는 자동 가져오기를 지원하지 않습니다. 차량 정보를 직접 입력해 주세요."); } catch { setNotice("올바른 매물 URL을 입력해 주세요."); } }} disabled={!listingUrl.trim()}>정보 불러오기</button></div></div> : <p className="start-hint">세부 정보를 입력한 후 사진을 업로드하세요.</p>}
+            {startMode === "listing" ? <div className="listing-import"><p>보배드림 사이버매장 매물 링크를 붙여넣으면 차량 정보와 사진을 가져옵니다.</p><div><input aria-label="차량 매물 링크" value={listingUrl} onChange={(event) => setListingUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") importListing(); }} placeholder="https://www.bobaedream.co.kr/cyber/CyberCar_view.php?..."/><button className="outline-button compact" onClick={importListing} disabled={!listingUrl.trim() || listingLoading}>{listingLoading ? <><LoaderCircle className="spin" size={15} /> 가져오는 중</> : "정보 불러오기"}</button></div></div> : <p className="start-hint">세부 정보를 입력한 후 사진을 업로드하세요.</p>}
           </section>
 
           <section className="section-block vehicle-block" aria-labelledby="vehicle-title">
