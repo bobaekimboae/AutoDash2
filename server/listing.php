@@ -85,19 +85,26 @@ function extract_vehicle(string $title, string $plain, string $html): array {
     foreach (['자동', '수동', 'CVT'] as $transmission) {
         if (mb_strpos($plain, $transmission) !== false) { $vehicle['transmission'] = $transmission; break; }
     }
-    foreach (['검정색', '흰색', '회색', '은색', '청색', '빨간색', '베이지색', '갈색'] as $color) {
-        if (mb_strpos($plain, $color) !== false) { $vehicle['color'] = $color; break; }
+    // The listing's spec table is authoritative. Searching all page text can miss
+    // colors such as 노란색 and can match unrelated copy, so read the labeled cell.
+    $vehicle['color'] = extract_table_value($html, '색상');
+    if ($vehicle['color'] === '') {
+        foreach (['진주색', '노란색', '주황색', '보라색', '초록색', '하늘색', '남색', '검정색', '흰색', '회색', '은색', '청색', '빨간색', '베이지색', '갈색'] as $color) {
+            if (mb_strpos($plain, $color) !== false) { $vehicle['color'] = $color; break; }
+        }
     }
 
     $sellerName = first_match($html, [
-        '~<div[^>]+class=["\'][^"\']*seller-state[^"\']*["\'][^>]*>[\s\S]*?<dt[^>]*>\s*<b[^>]*>\s*([^<]+?)\s*</b>\s*딜러\s*</dt>~i',
+        '~<div[^>]+class=["\'][^"\']*seller-state[^"\']*["\'][^>]*>[\s\S]*?<dt[^>]*>\s*<b[^>]*>\s*([^<]+?)\s*</b>\s*[^<]*</dt>~i',
         '~<div[^>]+class=["\'][^"\']*seller-state[^"\']*["\'][^>]*>[\s\S]*?<dt[^>]*>\s*([^<]+?)\s*딜러\s*</dt>~i',
     ]);
     $sellerName = trim(html_entity_decode(strip_tags($sellerName), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-    if ($sellerName !== '') $vehicle['dealer'] = $sellerName . ' 딜러';
+    if ($sellerName !== '') $vehicle['dealer'] = $sellerName;
 
     $normalized = preg_replace('/^(?:20\d{2}\s*|\d{2}년\s*)/u', '', $title) ?? $title;
-    $brands = ['롤스로이스', '메르세데스-벤츠', '벤츠', 'BMW', '아우디', '포르쉐', '폭스바겐', '볼보', '렉서스', '토요타', '제네시스', '현대', '기아'];
+    $normalized = preg_replace('/\s*중고차\s*$/u', '', $normalized) ?? $normalized;
+    $normalized = preg_replace('/\s*[-|｜]\s*$/u', '', $normalized) ?? $normalized;
+    $brands = ['롤스로이스', '메르세데스-벤츠', '벤츠', '페라리', '람보르기니', '포르쉐', '맥라렌', '애스턴마틴', '마세라티', 'BMW', '아우디', '폭스바겐', '볼보', '렉서스', '토요타', '제네시스', '현대', '기아'];
     foreach ($brands as $brand) {
         if (preg_match('/^' . preg_quote($brand, '/') . '\s+(.+)$/u', $normalized, $m)) {
             $vehicle['make'] = $brand;
@@ -108,15 +115,41 @@ function extract_vehicle(string $title, string $plain, string $html): array {
             } elseif ($brand === 'BMW' && preg_match('/^(X\d|[0-9]{1,2}\s?시리즈|M\d)(?:\s+(.*))?$/iu', $rest, $model)) {
                 $vehicle['model'] = strtoupper(str_replace(' ', '', $model[1]));
                 $vehicle['trim'] = trim($model[2] ?? '');
+            } elseif ($brand === '페라리' && preg_match('/^(로마|포르토피노|푸로산게|296|488|812|F8|SF90|라페라리)(?:\s+(.*))?$/iu', $rest, $model)) {
+                $vehicle['model'] = $model[1];
+                $vehicle['trim'] = trim($model[2] ?? '');
             } else {
                 $chunks = preg_split('/\s+/u', $rest, 2) ?: [$rest];
                 $vehicle['model'] = $chunks[0];
                 $vehicle['trim'] = trim($chunks[1] ?? '');
             }
+            $vehicle['trim'] = trim(preg_replace('/\s*[-|｜]+\s*$/u', '', $vehicle['trim']) ?? $vehicle['trim']);
             break;
         }
     }
     return $vehicle;
+}
+
+function extract_table_value(string $html, string $label): string {
+    if (!class_exists(DOMDocument::class)) return '';
+    $document = new DOMDocument();
+    $previous = libxml_use_internal_errors(true);
+    $document->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NOWARNING | LIBXML_NOERROR);
+    libxml_clear_errors();
+    libxml_use_internal_errors($previous);
+    $xpath = new DOMXPath($document);
+    foreach ($xpath->query('//tr') ?: [] as $row) {
+        $cells = [];
+        foreach ($xpath->query('./th|./td', $row) ?: [] as $cell) {
+            $cells[] = trim(preg_replace('/\s+/u', ' ', $cell->textContent) ?? $cell->textContent);
+        }
+        foreach ($cells as $index => $cellText) {
+            if ($cellText === $label && isset($cells[$index + 1])) {
+                return trim(preg_replace('/\s+/u', ' ', $cells[$index + 1]) ?? $cells[$index + 1]);
+            }
+        }
+    }
+    return '';
 }
 
 function extract_photos(string $html, string $id): array {
