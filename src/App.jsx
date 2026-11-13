@@ -542,7 +542,7 @@ export function App() {
               <label className="field"><span>연료</span><div className="input-wrap"><select value={vehicle.fuel} onChange={(event) => updateVehicle("fuel", event.target.value)}><option value="">선택</option><option>가솔린</option><option>디젤</option><option>하이브리드</option><option>전기</option><option>LPG</option></select><ChevronDown size={15} /></div></label>
               <label className="field"><span>변속기</span><div className="input-wrap"><select value={vehicle.transmission} onChange={(event) => updateVehicle("transmission", event.target.value)}><option value="">선택</option><option>자동</option><option>수동</option><option>CVT</option></select><ChevronDown size={15} /></div></label>
               <Field label="차량 색상" value={vehicle.color} onChange={(value) => updateVehicle("color", value)} placeholder="예: 사파이어 블랙" />
-              <Field label="판매처 이름" value={vehicle.dealer} onChange={(value) => updateVehicle("dealer", value)} placeholder="영상에 표시할 상호" />
+              <Field label="판매자 이름" value={vehicle.dealer} onChange={(value) => updateVehicle("dealer", value)} placeholder="예: 김영호 딜러" />
             </div>
             <div className="logo-row">
               <div className="logo-copy"><span className="logo-title">딜러 로고 <small>(선택 사항)</small></span><span className="muted">PNG, JPEG 또는 WebP 형식 · 최대 5MB</span></div>

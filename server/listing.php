@@ -45,7 +45,7 @@ $title = first_match($html, [
 $title = trim(html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 $title = preg_replace('/\s*[|｜].*$/u', '', $title) ?? $title;
 $title = preg_replace('/\s*중고차\s*$/u', '', $title) ?? $title;
-$vehicle = extract_vehicle($title, $plain);
+$vehicle = extract_vehicle($title, $plain, $html);
 $photos = extract_photos($html, $id);
 
 if (!$photos) {
@@ -66,7 +66,7 @@ function first_match(string $text, array $patterns): string {
     return '';
 }
 
-function extract_vehicle(string $title, string $plain): array {
+function extract_vehicle(string $title, string $plain, string $html): array {
     $vehicle = [
         'make' => '', 'model' => '', 'trim' => '', 'year' => '', 'mileage' => '',
         'price' => '', 'currency' => 'KRW · ₩', 'fuel' => '', 'transmission' => '',
@@ -88,6 +88,13 @@ function extract_vehicle(string $title, string $plain): array {
     foreach (['검정색', '흰색', '회색', '은색', '청색', '빨간색', '베이지색', '갈색'] as $color) {
         if (mb_strpos($plain, $color) !== false) { $vehicle['color'] = $color; break; }
     }
+
+    $sellerName = first_match($html, [
+        '~<div[^>]+class=["\'][^"\']*seller-state[^"\']*["\'][^>]*>[\s\S]*?<dt[^>]*>\s*<b[^>]*>\s*([^<]+?)\s*</b>\s*딜러\s*</dt>~i',
+        '~<div[^>]+class=["\'][^"\']*seller-state[^"\']*["\'][^>]*>[\s\S]*?<dt[^>]*>\s*([^<]+?)\s*딜러\s*</dt>~i',
+    ]);
+    $sellerName = trim(html_entity_decode(strip_tags($sellerName), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    if ($sellerName !== '') $vehicle['dealer'] = $sellerName . ' 딜러';
 
     $normalized = preg_replace('/^(?:20\d{2}\s*|\d{2}년\s*)/u', '', $title) ?? $title;
     $brands = ['롤스로이스', '메르세데스-벤츠', '벤츠', 'BMW', '아우디', '포르쉐', '폭스바겐', '볼보', '렉서스', '토요타', '제네시스', '현대', '기아'];
